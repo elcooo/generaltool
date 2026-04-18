@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Build outputs
+build/
+dist/
+*.egg-info/
+
+# Local replay/import data
+imports/
+*.rep
+
+# Local reference checkouts
+refs/
+
+# Local/editor files
+.env
+.env.*
+.vscode/
+.idea/
+*.log
