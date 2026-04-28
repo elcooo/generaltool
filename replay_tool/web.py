@@ -18,6 +18,7 @@ from replay_tool.analyzer import (
     parse_replay_preview_bytes,
 )
 from replay_tool.icon_provider import (
+    get_action_icon_data_uri,
     get_power_icon_data_uri,
     get_science_icon_data_uri,
     get_template_icon_data_uri,
@@ -867,6 +868,7 @@ async def analyze(file: UploadFile = File(...)) -> str:
                 or get_science_icon_data_uri(item.get("science_name"))
                 or get_upgrade_icon_data_uri(item.get("upgrade_name"))
                 or get_power_icon_data_uri(item.get("power_name"))
+                or get_action_icon_data_uri(item.get("action"))
             )
             sec = int(item.get("timecode", 0) / 30)
             timeline_items.append(

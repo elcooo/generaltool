@@ -347,3 +347,14 @@ def get_upgrade_icon_data_uri(upgrade_name: str | None) -> str | None:
 
 def get_power_icon_data_uri(power_name: str | None) -> str | None:
     return _resolve("power", power_name, lambda p, n: p.get_power_icon_data_uri(n))
+
+
+def get_action_icon_data_uri(action_name: str | None) -> str | None:
+    if not action_name:
+        return None
+    key = ("action", action_name)
+    if key in _disk_cache_uri:
+        return _disk_cache_uri[key]
+    uri = _read_cached_icon("action", action_name)
+    _disk_cache_uri[key] = uri
+    return uri
