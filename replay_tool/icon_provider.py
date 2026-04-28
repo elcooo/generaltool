@@ -79,6 +79,11 @@ class IconProvider:
         self.windowzh = _BigReader(self.install_dir / "WindowZH.big") if (self.install_dir / "WindowZH.big").exists() else None
         self._mapped_images = self._load_mapped_images()
         self._template_to_portrait = self._load_template_portraits()
+        (
+            self._science_to_image,
+            self._upgrade_to_image,
+            self._power_to_image,
+        ) = self._load_command_button_images()
         self._texture_path_cache: dict[str, str | None] = {}
         self._icon_cache: dict[str, str | None] = {}
 
@@ -150,6 +155,37 @@ class IconProvider:
                     mapping[obj_name] = m.group(1)
         return mapping
 
+    def _load_command_button_images(self) -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
+        science_map: dict[str, str] = {}
+        upgrade_map: dict[str, str] = {}
+        power_map: dict[str, str] = {}
+        for name in self.inizh.iter_names():
+            low = name.lower()
+            if not low.endswith("commandbutton.ini"):
+                continue
+            raw = self.inizh.read_bytes(name)
+            if raw is None:
+                continue
+            text = raw.decode("latin1", errors="replace")
+            for _btn_name, block in re.findall(
+                r"(?ims)^\s*CommandButton\s+([^\s]+)(.*?)^\s*End\s*$",
+                text,
+            ):
+                m_img = re.search(r"(?im)^\s*ButtonImage\s*=\s*([^\s;]+)", block)
+                if not m_img:
+                    continue
+                image = m_img.group(1)
+                m_sp = re.search(r"(?im)^\s*SpecialPower\s*=\s*([^\s;]+)", block)
+                if m_sp:
+                    power_map.setdefault(m_sp.group(1), image)
+                m_up = re.search(r"(?im)^\s*Upgrade\s*=\s*([^\s;]+)", block)
+                if m_up:
+                    upgrade_map.setdefault(m_up.group(1), image)
+                m_sc = re.search(r"(?im)^\s*Science\s*=\s*([^\s;]+)", block)
+                if m_sc:
+                    science_map.setdefault(m_sc.group(1), image)
+        return science_map, upgrade_map, power_map
+
     def _resolve_texture_path(self, texture_name: str) -> str | None:
         if texture_name in self._texture_path_cache:
             return self._texture_path_cache[texture_name]
@@ -170,26 +206,23 @@ class IconProvider:
             return img.transpose(Image.Transpose.ROTATE_180)
         return img
 
-    def get_icon_data_uri(self, template_name: str) -> str | None:
-        if template_name in self._icon_cache:
-            return self._icon_cache[template_name]
-        portrait = self._template_to_portrait.get(template_name)
-        if not portrait:
-            self._icon_cache[template_name] = None
-            return None
-        mapped = self._mapped_images.get(portrait)
+    def _render_mapped_image(self, mapped_name: str) -> str | None:
+        cache_key = f"__img__:{mapped_name}"
+        if cache_key in self._icon_cache:
+            return self._icon_cache[cache_key]
+        mapped = self._mapped_images.get(mapped_name)
         if not mapped:
-            self._icon_cache[template_name] = None
+            self._icon_cache[cache_key] = None
             return None
         texture_entry = self._resolve_texture_path(mapped.texture)
         if not texture_entry:
-            self._icon_cache[template_name] = None
+            self._icon_cache[cache_key] = None
             return None
         raw = self.englishzh.read_bytes(texture_entry)
         if raw is None and self.windowzh is not None:
             raw = self.windowzh.read_bytes(texture_entry)
         if raw is None:
-            self._icon_cache[template_name] = None
+            self._icon_cache[cache_key] = None
             return None
         try:
             img = Image.open(io.BytesIO(raw)).convert("RGBA")
@@ -200,11 +233,35 @@ class IconProvider:
             crop.save(out, format="PNG")
             b64 = base64.b64encode(out.getvalue()).decode("ascii")
             uri = f"data:image/png;base64,{b64}"
-            self._icon_cache[template_name] = uri
+            self._icon_cache[cache_key] = uri
             return uri
         except Exception:
-            self._icon_cache[template_name] = None
+            self._icon_cache[cache_key] = None
             return None
+
+    def get_icon_data_uri(self, template_name: str) -> str | None:
+        portrait = self._template_to_portrait.get(template_name)
+        if not portrait:
+            return None
+        return self._render_mapped_image(portrait)
+
+    def get_science_icon_data_uri(self, science_name: str) -> str | None:
+        image = self._science_to_image.get(science_name)
+        if not image:
+            return None
+        return self._render_mapped_image(image)
+
+    def get_upgrade_icon_data_uri(self, upgrade_name: str) -> str | None:
+        image = self._upgrade_to_image.get(upgrade_name)
+        if not image:
+            return None
+        return self._render_mapped_image(image)
+
+    def get_power_icon_data_uri(self, power_name: str) -> str | None:
+        image = self._power_to_image.get(power_name)
+        if not image:
+            return None
+        return self._render_mapped_image(image)
 
 
 _provider: IconProvider | None = None
@@ -212,21 +269,23 @@ _provider: IconProvider | None = None
 ICON_CACHE_DIR = Path(__file__).parent / "icons"
 
 
-def _safe_filename(template_name: str) -> str:
-    return re.sub(r"[^A-Za-z0-9_.-]", "_", template_name)
+def _safe_filename(name: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_.-]", "_", name)
 
 
-def _read_cached_icon(template_name: str) -> str | None:
-    if not ICON_CACHE_DIR.exists():
-        return None
-    path = ICON_CACHE_DIR / f"{_safe_filename(template_name)}.png"
-    if not path.exists():
-        return None
-    try:
-        b64 = base64.b64encode(path.read_bytes()).decode("ascii")
-        return f"data:image/png;base64,{b64}"
-    except Exception:
-        return None
+def _read_cached_icon(category: str, name: str) -> str | None:
+    if category == "template":
+        candidates = [ICON_CACHE_DIR / f"{_safe_filename(name)}.png", ICON_CACHE_DIR / "templates" / f"{_safe_filename(name)}.png"]
+    else:
+        candidates = [ICON_CACHE_DIR / f"{category}s" / f"{_safe_filename(name)}.png"]
+    for path in candidates:
+        if path.exists():
+            try:
+                b64 = base64.b64encode(path.read_bytes()).decode("ascii")
+                return f"data:image/png;base64,{b64}"
+            except Exception:
+                return None
+    return None
 
 
 def _guess_install_dir() -> str | None:
@@ -257,17 +316,34 @@ def _get_provider() -> IconProvider | None:
     return _provider
 
 
-_disk_cache_uri: dict[str, str | None] = {}
+_disk_cache_uri: dict[tuple[str, str], str | None] = {}
 
 
-def get_template_icon_data_uri(template_name: str | None) -> str | None:
-    if not template_name:
+def _resolve(category: str, name: str | None, live_lookup) -> str | None:
+    if not name:
         return None
     provider = _get_provider()
     if provider is not None:
-        return provider.get_icon_data_uri(template_name)
-    if template_name in _disk_cache_uri:
-        return _disk_cache_uri[template_name]
-    uri = _read_cached_icon(template_name)
-    _disk_cache_uri[template_name] = uri
+        return live_lookup(provider, name)
+    key = (category, name)
+    if key in _disk_cache_uri:
+        return _disk_cache_uri[key]
+    uri = _read_cached_icon(category, name)
+    _disk_cache_uri[key] = uri
     return uri
+
+
+def get_template_icon_data_uri(template_name: str | None) -> str | None:
+    return _resolve("template", template_name, lambda p, n: p.get_icon_data_uri(n))
+
+
+def get_science_icon_data_uri(science_name: str | None) -> str | None:
+    return _resolve("science", science_name, lambda p, n: p.get_science_icon_data_uri(n))
+
+
+def get_upgrade_icon_data_uri(upgrade_name: str | None) -> str | None:
+    return _resolve("upgrade", upgrade_name, lambda p, n: p.get_upgrade_icon_data_uri(n))
+
+
+def get_power_icon_data_uri(power_name: str | None) -> str | None:
+    return _resolve("power", power_name, lambda p, n: p.get_power_icon_data_uri(n))

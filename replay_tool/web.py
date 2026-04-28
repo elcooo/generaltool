@@ -17,7 +17,12 @@ from replay_tool.analyzer import (
     parse_replay_bytes,
     parse_replay_preview_bytes,
 )
-from replay_tool.icon_provider import get_template_icon_data_uri
+from replay_tool.icon_provider import (
+    get_power_icon_data_uri,
+    get_science_icon_data_uri,
+    get_template_icon_data_uri,
+    get_upgrade_icon_data_uri,
+)
 from replay_tool.importers import import_generals_online_replays
 
 
@@ -857,7 +862,12 @@ async def analyze(file: UploadFile = File(...)) -> str:
         )
         timeline_items = []
         for item in p.get("timeline", []):
-            icon_uri = get_template_icon_data_uri(item.get("template_name"))
+            icon_uri = (
+                get_template_icon_data_uri(item.get("template_name"))
+                or get_science_icon_data_uri(item.get("science_name"))
+                or get_upgrade_icon_data_uri(item.get("upgrade_name"))
+                or get_power_icon_data_uri(item.get("power_name"))
+            )
             sec = int(item.get("timecode", 0) / 30)
             timeline_items.append(
                 f"<div data-sec=\"{sec}\" class=\"timeline-item{' timeline-move' if item.get('action') == 'MoveTo' else ''}{'' if icon_uri else ' timeline-noicon'}\">"
