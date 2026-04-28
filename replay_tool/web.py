@@ -992,7 +992,7 @@ async def analyze(file: UploadFile = File(...)) -> str:
             Hide Move actions
           </label>
           <label style="margin-left: 14px;">
-            <input id="hide-action-text" type="checkbox" />
+            <input id="hide-action-text" type="checkbox" checked />
             Hide action text (icons only)
           </label>
           <label style="margin-left: 14px;">
@@ -1079,49 +1079,71 @@ async def analyze(file: UploadFile = File(...)) -> str:
           document.querySelectorAll(".timeline-move").forEach((el) => {{
             el.style.display = checkbox.checked ? "none" : "";
           }});
-          document.querySelectorAll(".timeline-wrap").forEach((el) => {{
+          const wraps = Array.from(document.querySelectorAll(".timeline-wrap"));
+          const perWrap = wraps.map((el) => {{
             if (hideTextCheckbox && hideTextCheckbox.checked) {{
               el.classList.add("hide-text");
             }} else {{
               el.classList.remove("hide-text");
             }}
-            const sourceItems = el.querySelectorAll(".timeline-source .timeline-item");
+            const sourceItems = Array.from(el.querySelectorAll(".timeline-source .timeline-item"));
+            const visibleByBucket = new Map();
             sourceItems.forEach((item) => {{
               const hiddenByMove = item.classList.contains("timeline-move") && checkbox.checked;
               const hiddenByNoIcon = item.classList.contains("timeline-noicon") && hideTextCheckbox && hideTextCheckbox.checked;
-              item.style.display = hiddenByMove || hiddenByNoIcon ? "none" : "";
+              const visible = !(hiddenByMove || hiddenByNoIcon);
+              item.style.display = visible ? "" : "none";
+              if (!visible) return;
+              const sec = parseInt(item.getAttribute("data-sec") || "0", 10) || 0;
+              const start = Math.floor(sec / groupSeconds) * groupSeconds;
+              if (!visibleByBucket.has(start)) visibleByBucket.set(start, []);
+              visibleByBucket.get(start).push(item);
             }});
+            return {{ el, visibleByBucket }};
+          }});
+
+          const allStarts = new Set();
+          const maxItemsPerBucket = new Map();
+          perWrap.forEach(({{ visibleByBucket }}) => {{
+            visibleByBucket.forEach((items, start) => {{
+              allStarts.add(start);
+              const prev = maxItemsPerBucket.get(start) || 0;
+              if (items.length > prev) maxItemsPerBucket.set(start, items.length);
+            }});
+          }});
+          const sortedStarts = Array.from(allStarts).sort((a, b) => a - b);
+
+          // Approximate item box: ~40px wide + 6px gap. Estimate rows assuming
+          // typical container width; CSS flex-wrap will lay them out and the
+          // min-height ensures alignment across players.
+          const ITEM_HEIGHT = 42; // px per visual row
+          const ITEMS_PER_ROW = 8; // assumed wrap density
+          const LABEL_HEIGHT = 22;
+
+          perWrap.forEach(({{ el, visibleByBucket }}) => {{
             const bucketsHost = el.querySelector(".timeline-buckets");
             if (!bucketsHost) return;
             bucketsHost.innerHTML = "";
-            const buckets = new Map();
-            sourceItems.forEach((item) => {{
-              if (item.style.display === "none") return;
-              const sec = parseInt(item.getAttribute("data-sec") || "0", 10) || 0;
-              const start = Math.floor(sec / groupSeconds) * groupSeconds;
-              let bucket = buckets.get(start);
-              if (!bucket) {{
-                const bucketEl = document.createElement("div");
-                bucketEl.className = "timeline-bucket";
-                const actionsEl = document.createElement("div");
-                actionsEl.className = "bucket-actions";
-                bucketEl.appendChild(actionsEl);
-                const labelEl = document.createElement("div");
-                labelEl.className = "bucket-label";
-                labelEl.textContent = `${{toClock(start)}}-${{toClock(start + groupSeconds - 1)}}`;
-                bucketEl.appendChild(labelEl);
-                bucketsHost.appendChild(bucketEl);
-                bucket = actionsEl;
-                buckets.set(start, bucket);
-              }}
-              const clone = item.cloneNode(true);
-              clone.style.display = "";
-              bucket.appendChild(clone);
-            }});
-            el.querySelectorAll(".timeline-noicon").forEach((item) => {{
-              const hiddenByMove = item.classList.contains("timeline-move") && checkbox.checked;
-              if (hiddenByMove) return;
-              item.style.display = hideTextCheckbox && hideTextCheckbox.checked ? "none" : "";
+            sortedStarts.forEach((start) => {{
+              const items = visibleByBucket.get(start) || [];
+              const bucketEl = document.createElement("div");
+              bucketEl.className = "timeline-bucket";
+              const actionsEl = document.createElement("div");
+              actionsEl.className = "bucket-actions";
+              const maxItems = maxItemsPerBucket.get(start) || 0;
+              const rows = Math.max(1, Math.ceil(maxItems / ITEMS_PER_ROW));
+              actionsEl.style.minHeight = (rows * ITEM_HEIGHT) + "px";
+              items.forEach((item) => {{
+                const clone = item.cloneNode(true);
+                clone.style.display = "";
+                actionsEl.appendChild(clone);
+              }});
+              bucketEl.appendChild(actionsEl);
+              const labelEl = document.createElement("div");
+              labelEl.className = "bucket-label";
+              labelEl.textContent = `${{toClock(start)}}-${{toClock(start + groupSeconds - 1)}}`;
+              bucketEl.appendChild(labelEl);
+              bucketsHost.appendChild(bucketEl);
             }});
           }});
         }};
