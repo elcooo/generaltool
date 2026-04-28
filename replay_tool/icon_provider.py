@@ -209,6 +209,25 @@ class IconProvider:
 
 _provider: IconProvider | None = None
 
+ICON_CACHE_DIR = Path(__file__).parent / "icons"
+
+
+def _safe_filename(template_name: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_.-]", "_", template_name)
+
+
+def _read_cached_icon(template_name: str) -> str | None:
+    if not ICON_CACHE_DIR.exists():
+        return None
+    path = ICON_CACHE_DIR / f"{_safe_filename(template_name)}.png"
+    if not path.exists():
+        return None
+    try:
+        b64 = base64.b64encode(path.read_bytes()).decode("ascii")
+        return f"data:image/png;base64,{b64}"
+    except Exception:
+        return None
+
 
 def _guess_install_dir() -> str | None:
     candidates = [
@@ -238,10 +257,17 @@ def _get_provider() -> IconProvider | None:
     return _provider
 
 
+_disk_cache_uri: dict[str, str | None] = {}
+
+
 def get_template_icon_data_uri(template_name: str | None) -> str | None:
     if not template_name:
         return None
     provider = _get_provider()
-    if provider is None:
-        return None
-    return provider.get_icon_data_uri(template_name)
+    if provider is not None:
+        return provider.get_icon_data_uri(template_name)
+    if template_name in _disk_cache_uri:
+        return _disk_cache_uri[template_name]
+    uri = _read_cached_icon(template_name)
+    _disk_cache_uri[template_name] = uri
+    return uri
