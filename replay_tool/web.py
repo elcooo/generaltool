@@ -9,7 +9,8 @@ from typing import Any
 from urllib.parse import quote
 
 from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from replay_tool.analyzer import (
     ReplayParseError,
@@ -30,6 +31,14 @@ from replay_tool.importers import import_generals_online_replays
 app = FastAPI(title="Zero Hour Replay Analyzer")
 _LIBRARY_CACHE: dict[str, dict[str, Any]] = {}
 _REPLAY_VALIDITY_CACHE: dict[str, dict[str, Any]] = {}
+
+_ICONS_DIR = Path(__file__).parent / "icons"
+if _ICONS_DIR.exists():
+    app.mount("/icons", StaticFiles(directory=str(_ICONS_DIR)), name="icons")
+
+_FRONTEND_DIST = Path(__file__).parent / "static"
+if _FRONTEND_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=str(_FRONTEND_DIST / "assets")), name="assets")
 
 
 ARMY_BY_FACTION = {
@@ -317,7 +326,10 @@ def index() -> str:
           <input type="file" name="file" accept=".rep" required />
           <div class="actions">
             <button type="submit">Analyze Replay</button>
-            <span class="hint">Single replay deep analysis</span>
+            <a href="/report" style="text-decoration:none;">
+              <button type="button" style="background:linear-gradient(120deg,#3a8266,#266f59);">Open New Report (Beta)</button>
+            </a>
+            <span class="hint">Beta opens the React vertical-timeline viewer.</span>
           </div>
         </form>
         <div class="section">
@@ -814,6 +826,57 @@ async def analyze_local(path: str = Query(...)) -> str:
   </body>
 </html>
 """
+
+
+def _icon_url(category: str, name: str | None) -> str | None:
+    if not name:
+        return None
+    safe = "".join(c if c.isalnum() or c in "_.-" else "_" for c in name)
+    if category == "template":
+        return f"/icons/{safe}.png"
+    return f"/icons/{category}s/{safe}.png"
+
+
+def _enrich_timeline_with_icons(report: dict[str, Any]) -> dict[str, Any]:
+    for player in report.get("players", []):
+        for item in player.get("timeline", []):
+            icon = (
+                (_icon_url("template", item.get("template_name")) if item.get("template_name") else None)
+                or (_icon_url("science", item.get("science_name")) if item.get("science_name") else None)
+                or (_icon_url("upgrade", item.get("upgrade_name")) if item.get("upgrade_name") else None)
+                or (_icon_url("power", item.get("power_name")) if item.get("power_name") else None)
+                or (_icon_url("action", item.get("action")) if item.get("action") else None)
+            )
+            item["icon_url"] = icon
+    return report
+
+
+@app.post("/api/analyze")
+async def api_analyze(file: UploadFile = File(...)) -> JSONResponse:
+    if not file.filename.lower().endswith(".rep"):
+        raise HTTPException(status_code=400, detail="Please upload a .rep replay file.")
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+    try:
+        report = analyze_replay_bytes(data)
+    except ReplayParseError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    report["filename"] = file.filename
+    return JSONResponse(_enrich_timeline_with_icons(report))
+
+
+@app.get("/report", response_class=HTMLResponse)
+async def report_shell() -> str:
+    index = _FRONTEND_DIST / "index.html"
+    if index.exists():
+        return index.read_text(encoding="utf-8")
+    return """<!doctype html><html><body>
+<h1>React frontend not built</h1>
+<p>Run <code>cd frontend &amp;&amp; npm install &amp;&amp; npm run build</code> to produce
+<code>replay_tool/static/index.html</code>.</p>
+<p><a href="/">Back</a></p>
+</body></html>"""
 
 
 @app.post("/analyze", response_class=HTMLResponse)

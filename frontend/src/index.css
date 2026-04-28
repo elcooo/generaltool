@@ -1,0 +1,110 @@
+body {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  background: #ecebe6;
+  color: #1d232b;
+}
+
+.wrap {
+  max-width: 1200px;
+  margin: 24px auto;
+  padding: 0 16px;
+}
+
+.panel {
+  background: #fdfbf6;
+  border: 1px solid #d8d2c6;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 14px;
+  box-shadow: 0 6px 20px rgba(21, 35, 48, 0.06);
+}
+
+h1 {
+  margin: 0 0 8px 0;
+  font-size: 1.6rem;
+}
+
+.muted {
+  color: #5d6774;
+  font-size: 14px;
+}
+
+button {
+  border: 0;
+  border-radius: 9px;
+  background: linear-gradient(120deg, #0c5f7d, #0b6a76);
+  color: white;
+  padding: 9px 14px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.vt-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: block;
+  margin: 6px auto 0;
+}
+
+.vt-card {
+  font-size: 13px;
+}
+
+.vt-time {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-weight: 600;
+  color: #0c5f7d;
+}
+
+.vt-label {
+  font-weight: 600;
+}
+
+.vt-detail {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  color: #5d6774;
+  font-size: 11px;
+  display: block;
+  margin-top: 2px;
+}
+
+.toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.toolbar label {
+  font-size: 13px;
+  color: #5d6774;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+
+th,
+td {
+  border-bottom: 1px solid #e8e1d2;
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  background: #f2ecdf;
+}

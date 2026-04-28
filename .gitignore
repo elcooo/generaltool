@@ -16,6 +16,9 @@ imports/
 # Local reference checkouts
 refs/
 
+# Frontend
+frontend/node_modules/
+
 # Local/editor files
 .env
 .env.*
