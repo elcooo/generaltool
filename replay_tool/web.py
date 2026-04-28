@@ -855,6 +855,21 @@ def _enrich_timeline_with_icons(report: dict[str, Any]) -> dict[str, Any]:
     return report
 
 
+_DEMO_REPLAY = Path(__file__).parent / "demo.rep"
+
+
+@app.get("/api/demo")
+async def api_demo() -> JSONResponse:
+    if not _DEMO_REPLAY.exists():
+        raise HTTPException(status_code=404, detail="Demo replay not bundled.")
+    try:
+        report = analyze_replay_bytes(_DEMO_REPLAY.read_bytes())
+    except ReplayParseError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    report["filename"] = _DEMO_REPLAY.name
+    return JSONResponse(_enrich_timeline_with_icons(report))
+
+
 @app.post("/api/analyze")
 async def api_analyze(file: UploadFile = File(...)) -> JSONResponse:
     if not file.filename.lower().endswith(".rep"):

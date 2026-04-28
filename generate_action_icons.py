@@ -39,6 +39,13 @@ SPECS: dict[str, tuple[str, str, str]] = {
     "CancelUnit": ("#8a1f1f", "#ffffff", "✕"),
     "CancelUpgrade": ("#8a1f1f", "#ffffff", "✕"),
     "CancelBuild": ("#8a1f1f", "#ffffff", "✕"),
+    "BeginUpgrade": ("#3a7d3a", "#ffffff", "▲"),
+    "CreateUnit": ("#2e6da4", "#ffffff", "U"),
+    "BuildObject": ("#a07020", "#ffffff", "B"),
+    "PurchaseScience": ("#c89f2a", "#000000", "★"),
+    "SpecialPower": ("#7a4a8a", "#ffffff", "✦"),
+    "SpecialPowerAtLocation": ("#7a4a8a", "#ffffff", "✦"),
+    "SpecialPowerAtObject": ("#7a4a8a", "#ffffff", "✦"),
 }
 
 # Group icons (one per digit). Generated programmatically below.
