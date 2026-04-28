@@ -980,7 +980,7 @@ async def analyze(file: UploadFile = File(...)) -> str:
             Hide Move actions
           </label>
           <label style="margin-left: 14px;">
-            <input id="hide-action-text" type="checkbox" checked />
+            <input id="hide-action-text" type="checkbox" />
             Hide action text (icons only)
           </label>
           <label style="margin-left: 14px;">
