@@ -226,7 +226,19 @@ def _player_match_score(query: str, name_l: str) -> int:
 
 
 @app.get("/", response_class=HTMLResponse)
-def index() -> str:
+async def root_report() -> str:
+    index = _FRONTEND_DIST / "index.html"
+    if index.exists():
+        return index.read_text(encoding="utf-8")
+    return """<!doctype html><html><body>
+<h1>React frontend not built</h1>
+<p>Run <code>cd frontend &amp;&amp; npm install &amp;&amp; npm run build</code>.</p>
+<p><a href="/homedev">Old homepage</a></p>
+</body></html>"""
+
+
+@app.get("/homedev", response_class=HTMLResponse)
+def homedev() -> str:
     return """
 <!doctype html>
 <html lang="en">
