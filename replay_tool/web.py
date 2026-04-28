@@ -833,8 +833,12 @@ def _icon_url(category: str, name: str | None) -> str | None:
         return None
     safe = "".join(c if c.isalnum() or c in "_.-" else "_" for c in name)
     if category == "template":
-        return f"/icons/{safe}.png"
-    return f"/icons/{category}s/{safe}.png"
+        rel = f"{safe}.png"
+    else:
+        rel = f"{category}s/{safe}.png"
+    if not (_ICONS_DIR / rel).exists():
+        return None
+    return f"/icons/{rel}"
 
 
 def _enrich_timeline_with_icons(report: dict[str, Any]) -> dict[str, Any]:
