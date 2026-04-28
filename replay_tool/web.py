@@ -1113,13 +1113,8 @@ async def analyze(file: UploadFile = File(...)) -> str:
           }});
           const sortedStarts = Array.from(allStarts).sort((a, b) => a - b);
 
-          // Approximate item box: ~40px wide + 6px gap. Estimate rows assuming
-          // typical container width; CSS flex-wrap will lay them out and the
-          // min-height ensures alignment across players.
-          const ITEM_HEIGHT = 42; // px per visual row
-          const ITEMS_PER_ROW = 8; // assumed wrap density
-          const LABEL_HEIGHT = 22;
-
+          // Pass 1: render every wrap with every bucket (empty buckets included
+          // for symmetry). Tag each bucket with its start so we can align later.
           perWrap.forEach(({{ el, visibleByBucket }}) => {{
             const bucketsHost = el.querySelector(".timeline-buckets");
             if (!bucketsHost) return;
@@ -1128,11 +1123,9 @@ async def analyze(file: UploadFile = File(...)) -> str:
               const items = visibleByBucket.get(start) || [];
               const bucketEl = document.createElement("div");
               bucketEl.className = "timeline-bucket";
+              bucketEl.dataset.start = String(start);
               const actionsEl = document.createElement("div");
               actionsEl.className = "bucket-actions";
-              const maxItems = maxItemsPerBucket.get(start) || 0;
-              const rows = Math.max(1, Math.ceil(maxItems / ITEMS_PER_ROW));
-              actionsEl.style.minHeight = (rows * ITEM_HEIGHT) + "px";
               items.forEach((item) => {{
                 const clone = item.cloneNode(true);
                 clone.style.display = "";
@@ -1144,6 +1137,28 @@ async def analyze(file: UploadFile = File(...)) -> str:
               labelEl.textContent = `${{toClock(start)}}-${{toClock(start + groupSeconds - 1)}}`;
               bucketEl.appendChild(labelEl);
               bucketsHost.appendChild(bucketEl);
+            }});
+          }});
+
+          // Pass 2: measure each bucket's natural height across all wraps,
+          // then set min-height to the max so rows line up.
+          requestAnimationFrame(() => {{
+            const heightByStart = new Map();
+            perWrap.forEach(({{ el }}) => {{
+              el.querySelectorAll(".timeline-bucket").forEach((b) => {{
+                b.style.minHeight = "";
+                const start = parseInt(b.dataset.start || "0", 10);
+                const h = b.getBoundingClientRect().height;
+                const prev = heightByStart.get(start) || 0;
+                if (h > prev) heightByStart.set(start, h);
+              }});
+            }});
+            perWrap.forEach(({{ el }}) => {{
+              el.querySelectorAll(".timeline-bucket").forEach((b) => {{
+                const start = parseInt(b.dataset.start || "0", 10);
+                const h = heightByStart.get(start) || 0;
+                if (h > 0) b.style.minHeight = h + "px";
+              }});
             }});
           }});
         }};
